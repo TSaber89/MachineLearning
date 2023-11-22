@@ -1,0 +1,146 @@
+---
+title: "Machine Learning Final Project"
+author: "Terry Fehlhaber"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## **Background**
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: 
+http://groupware.les.inf.puc-rio.br/har
+ (see the section on the Weight Lifting Exercise Dataset). 
+
+## **Data** 
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: 
+http://groupware.les.inf.puc-rio.br/har
+. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment. 
+
+## **Packages and Libraries**
+install.packages("caret", repos = "http://cran.us.r-project.org")  
+install.packages("ggplot2",repos = "http://cran.us.r-project.org")  
+install.packages("randomForest",repos = "http://cran.us.r-project.org")  
+install.packages("gbm",repos = "http://cran.us.r-project.org")  
+install.packages("corrplot",repos = "http://cran.us.r-project.org")  
+install.packages("devtools",repos = "http://cran.us.r-project.org")  
+
+library(caret)  
+library(rpart)  
+library(rpart.plot)  
+library(RColorBrewer)  
+library(rattle)  
+library(RGtk2)  
+library(randomForest)  
+library(gbm)  
+library(corrplot)  
+library(devtools)  
+library(randomForest)  
+
+
+
+
+
+```{r setup,include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+install.packages("caret", repos = "http://cran.us.r-project.org")
+install.packages("ggplot2",repos = "http://cran.us.r-project.org")
+install.packages("randomForest",repos = "http://cran.us.r-project.org")
+install.packages("gbm",repos = "http://cran.us.r-project.org")
+install.packages("corrplot",repos = "http://cran.us.r-project.org")
+install.packages("devtools",repos = "http://cran.us.r-project.org")
+
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(RGtk2)
+library(randomForest)
+library(gbm)
+library(corrplot)
+library(devtools)
+library(randomForest)
+```
+
+## **Load the Data**
+
+```{r,echo=TRUE}
+train_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+init_testing_data <- read.csv(url(test_url),header=TRUE,sep=",",na.strings=c("NA",""))
+init_testing_data <- read.csv(url(test_url),na.strings=c("","NA","DIV/#0!"))
+init_training_data <- read.csv(url(train_url),na.strings=c("","NA","DIV/#0!"))
+
+dim(init_training_data) 
+dim(init_testing_data)  
+```
+
+
+## **Clean the Data**
+### Remove unused columns and missing values
+
+```{r,echo=TRUE}
+Clean_Train <-init_training_data[,-(nearZeroVar(init_training_data))]
+Clean_Test <- init_testing_data[,-(nearZeroVar(init_testing_data))] 
+Train_na <- sapply(Clean_Train,function(x) mean(is.na(x))) > 0.95  
+Test_na <- sapply(Clean_Test,function(x) mean(is.na(x))) > 0.95  
+Train_na2 <- Clean_Train[,Train_na==F]
+Test_na2 <- Clean_Test[,Test_na==F]
+Last_Train <- Train_na2[,-(1:6)]
+Last_Test <- Test_na2[,-(1:6)]
+Last_Train$classe <- factor(Last_Train$classe)
+```
+
+## **Split the Data into Testing and Training Datasets**
+```{r,echo=TRUE}
+Train_Slice <-createDataPartition(Last_Train$classe,p=.66,list=FALSE)
+Last_Train_Slice <- Last_Train[Train_Slice,]
+Last_Test_Slice <- Last_Train[-Train_Slice,]
+```
+
+## **Model the Data using Random Forest** 
+The Random Forest model was selected for this project as it is a highly efficient predictor when large databases are used.  It also provides efficient estimates of the test error. The Random Forest methodology will be used against the created training and testing datasets.  
+
+
+```{r,echo=TRUE}
+TrainingModel1 <- randomForest(classe ~ .,data=Last_Train_Slice)
+TrainingModel1
+```
+
+
+## **Evaluate this model using ConfusionMatrix with the testing dataset**
+
+```{r,echo=TRUE}
+TrainingModel2<- confusionMatrix(predict(TrainingModel1,                         newdata=Last_Test_Slice[,-ncol(Last_Test_Slice)]),Last_Test_Slice$classe)
+TrainingModel2
+Compare <- c(as.numeric(predict(TrainingModel1,                               newdata=Last_Test_Slice[,-ncol(Last_Test_Slice)])==Last_Test_Slice$classe))
+MeasurePrecision <- (sum(Compare)/nrow(Last_Test_Slice)) *100
+MeasurePrecision
+```
+
+## **The estimated accuracy of the Random Forest Model is 99.51%**
+
+## **The expected out-of-sample error is 1-accuracy or, in this case, .49%**
+
+
+# Rebuild the Model
+```{r,echo=TRUE}
+TrainingModel1 <- randomForest(classe ~., data=Last_Train_Slice)
+TrainingModel1
+```
+
+
+#Preparing for the quiz
+
+TestCases <- Last_Test[,-ncol(Last_Test)]  
+TestNewCol<-predict(TrainingModel1,newdata=Last_Test_Slice)  
+TestNewColFinal<-cbind(Last_Test_Slice,TestNewCol)  
+
